@@ -40,6 +40,7 @@ app.post('/users', async (req, res) => {
     const { name, email, password, profileImage } = req.body;
 
     try {
+        await database.query(`ALTER TABLE users AUTO_INCREMENT=1;`);
         await database.query(
             `INSERT INTO users(
                 name,

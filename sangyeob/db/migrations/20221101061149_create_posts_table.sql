@@ -7,8 +7,7 @@ CREATE TABLE posts (
     user_id INT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT posts_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id),
-    UNIQUE (id)
+    CONSTRAINT posts_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- migrate:down
