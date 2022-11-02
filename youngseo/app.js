@@ -1,15 +1,14 @@
+require("dotenv").config();
+
 const http = require("http");
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
 
-// 환경 변수 선언 이전에 설정 
-dotenv.config()
-
 const { DataSource } = require('typeorm');
 
-const myDataSource = new DataSource({
+const appDataSource = new DataSource({
     type: process.env.TYPEORM_CONNECTION,
     host: process.env.TYPEORM_HOST,
     port: process.env.TYPEORM_PORT,
@@ -18,10 +17,14 @@ const myDataSource = new DataSource({
     database: process.env.TYPEORM_DATABASE
 })
 
-myDataSource.initialize()
+appDataSource.initialize()
     .then(() => {
         console.log("Data Source has been initialized!")
     })
+    .catch((err) => {
+        console.error("Error during Data Source initialization", err)
+    });
+    
 
 const app = express()
 
@@ -31,7 +34,7 @@ app.use(morgan('dev'));
 
 
 app.get("/ping", (req,res) => {
-    res.json({ message : "pong"})
+    return res.status(200).json({ message : "pong"})
 });
 
 const server = http.createServer(app)
