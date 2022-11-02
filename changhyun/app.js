@@ -33,4 +33,12 @@ app.get("/ping", function (req, res, next) {
   return res.status(200).json({ message : "pong" });
 })
 
+app.post("/create", async (req, res) => {
+	const { name, password, email} = req.body
+	await appDataSource.query(
+		`INSERT INTO users(name,password,email) VALUES (?, ?, ?);`, [ name, password, email ]
+	); 
+    res.status(201).json({ message : "userCreated" });
+	})
+
 app.listen(PORT, () => { console.log(`server listening on port ${PORT}`)});
