@@ -1,14 +1,14 @@
+require("dotenv").config();
+
 const http = require("http");
+
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 
-const dotenv = require("dotenv");
-dotenv.config();
-
 const { DataSource } = require("typeorm");
 
-const myDataSource = new DataSource({
+const mysqlDataSource = new DataSource({
   type: process.env.TYPEORM_CONNECTION,
   host: process.env.TYPEORM_HOST,
   port: process.env.TYPEORM_PORT,
@@ -17,19 +17,23 @@ const myDataSource = new DataSource({
   database: process.env.TYPEORM_DATABASE,
 });
 
-myDataSource.initialize().then(() => {
+myDataSource.initialize()
+  .then(() => {
   console.log("Data Source has been initialized!");
-});
+  })
+  .catch((err)=>{
+    console.log("Error during Data Source initialization",err)
+  })
 
 const app = express();
 
-app.use(express.json()); // 외부에서 들어온 데이터값을 parsing
+app.use(express.json()); 
 app.use(cors());
 app.use(morgan("dev"));
 
-// dotenv.config();
+
 app.get("/ping", (req, res) => {
-  res.json({ message: "pong" });
+  return res.status(200).json({ message: "pong" });
 });
 
 const server = http.createServer(app);
