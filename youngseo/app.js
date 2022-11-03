@@ -53,6 +53,94 @@ app.post("/users/signup", async (req, res) => {
     res.status(201).json({ message: "userCreated" });
 });
 
+app.post("/posts", async (req, res) => {
+    const { title, content, content_image, user_id } = req.body
+
+    await appDataSource.query(
+        `INSERT INTO posts(
+            title,
+            content,
+            content_image,
+            user_id
+        ) VALUES (?, ?, ?, ?);
+        `,
+        [ title, content, content_image, user_id ]
+    ); 
+    res.status(201).json({ message: "postCreated" });
+});
+
+app.get("/posts", async(req, res) => {
+    await appDataSource.query(
+        `SELECT 
+            users.id AS userId,
+            users.profile_image AS userProfileImage,
+            posts.id AS postingId,
+            posts.content_image AS postigImageUrl,
+            posts.content AS postingContent
+        FROM users 
+        INNER JOIN posts ON users.id = posts.user_id`
+            ,(err, rows) => {
+        res.status(200).json({data:rows});
+            });
+});
+
+
+app.get("/posts/:userId", async (req, res) => {
+    const userid = req.params.userId
+
+    const [user] = await appDataSource.query(
+        `SELECT 
+            users.id AS userId,
+            users.profile_image AS userProfileImage
+        FROM users
+        WHERE users.id = ${userid}`);
+    
+    const posts = await appDataSource.query(
+        `SELECT 
+            posts.id AS postingId,
+            posts.content_image AS postingImageUrl,
+            posts.content AS postigContent
+        FROM posts
+        INNER JOIN users ON users.id = posts.user_id
+        WHERE users.id = ${userid}`);
+
+    user['postings'] = posts;
+
+    res.status(200).json({ data: user })
+});
+
+
+app.patch("/posts/:userId/:postId", async (req, res) => {
+    const { title, content} = req.body
+    const userid = req.params.userId
+    const postid = req.params.postId
+
+    await appDataSource.query(
+        `UPDATE posts 
+        SET 
+            posts.title = ?, 
+            posts.content = ?
+        WHERE posts.id = ${postid}
+        `,
+        [ title, content ]
+    ); 
+
+    const [result] = await appDataSource.query(
+        `SELECT 
+            users.id AS userId,
+            users.name AS userName,
+            posts.id AS postingId,
+            posts.title AS postingTitle,
+            posts.content AS postingContent
+        FROM users 
+        INNER JOIN posts ON users.id = posts.user_id
+        WHERE users.id = ${userid} AND posts.id = ${postid}`
+        );
+    res.status(200).json({data: result});
+});
+
+
+
 const server = http.createServer(app)
 const PORT = process.env.PORT
 
