@@ -1,3 +1,4 @@
+//TODO 스테이터스코드체크, assignment 4부터 확인
 require('dotenv').config();
 
 const http = require('http');
@@ -6,7 +7,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 
-const { DataSource, Double } = require('typeorm');
+const { DataSource } = require('typeorm');
 
 const database = new DataSource({
     type: process.env.TYPEORM_CONNECTION,
@@ -52,7 +53,6 @@ app.post('/users', async (req, res) => {
         );
         return res.status(201).json({ message: 'user successfully created' });
     } catch (err) {
-        console.log(err.sqlMessage);
         if (err.errno === 1048) {
             return res.status(409).json({ error: 'invalid input' });
         } else if (err.sqlMessage.includes('Duplicate entry')) {
@@ -65,7 +65,6 @@ app.post('/users', async (req, res) => {
     }
 });
 
-// 도배 처리 에러 추가 해야함
 app.post('/posts', async (req, res) => {
     const { title, content, contentImage, userId } = req.body;
 
@@ -82,7 +81,6 @@ app.post('/posts', async (req, res) => {
         );
         return res.status(201).json({ message: 'post successfully created' });
     } catch (err) {
-        console.log(err.sqlMessage);
         if (err.sqlMessage.includes('foreign key constraint fails')) {
             return res.status(409).json({ error: 'no such user' });
         } else {
@@ -103,92 +101,102 @@ app.get('/posts', async (req, res) => {
         INNER JOIN posts ON posts.user_id = users.id
         `,
         (err, posts) => {
-            console.log(posts);
             res.status(200).json(posts);
         }
     );
 });
 
-app.get('/users/posts', async (req, res) => {
-    const { userId } = req.body;
+app.get('/users/:userId/posts', async (req, res) => {
+    const { userId } = req.params;
 
     const obj = {};
     obj.userId = userId;
-
-    let userProfileImage = await database.query(
-        `SELECT
+    try {
+        let userProfileImage = await database.query(
+            `SELECT
             profile_image
-        FROM users WHERE id = ${userId};
-        `
-    );
-    const { profile_image } = JSON.parse(JSON.stringify(userProfileImage[0]));
+            FROM users WHERE id = ${userId};
+            `
+        );
+        const { profile_image } = JSON.parse(
+            JSON.stringify(userProfileImage[0])
+        );
 
-    obj.userProfileImage = profile_image;
+        obj.userProfileImage = profile_image;
 
-    let postsbyUser = await database.query(
-        `SELECT
+        let postsbyUser = await database.query(
+            `SELECT
             id as postingId,
             content_image as postingImageUrl,
             content as postingContent
-        FROM posts WHERE user_id = ${userId};
-        `
-    );
+            FROM posts WHERE user_id = ${userId};
+            `
+        );
 
-    obj.postings = postsbyUser;
-    return res.status(200).json({ data: obj });
+        obj.postings = postsbyUser;
+        return res.status(200).json({ data: obj });
+    } catch (err) {
+        console.log(err);
+        return res.status(409).json({ error: 'invalid input' });
+    }
 });
 
 app.put('/posts', async (req, res) => {
     const { postingId, postingTitle, postingContent, postingImage } = req.body;
-
-    await database.query(
-        `UPDATE posts
-            SET
-                title = ?,
-                content = ?,
-                content_image = ?
-                WHERE id = ?;
-        `,
-        [postingTitle, postingContent, postingImage, postingId]
-    );
-    await database.query(
-        `SELECT
-            users.id as userId,
-            users.name as userName,
-            posts.id as postingId,
-            posts.title as postingTitle,
-            posts.content as postingContent
-            FROM users
-            INNER JOIN posts 
-            WHERE posts.id = ${postingId} AND posts.user_id=users.id;
-        `,
-        (err, rows) => {
-            console.log(rows);
-            res.status(200).json({ data: rows });
-        }
-    );
+    try {
+        await database.query(
+            `UPDATE posts
+                SET
+                    title = ?,
+                    content = ?,
+                    content_image = ?
+                    WHERE id = ?;
+            `,
+            [postingTitle, postingContent, postingImage, postingId]
+        );
+        await database.query(
+            `SELECT
+                users.id as userId,
+                users.name as userName,
+                posts.id as postingId,
+                posts.title as postingTitle,
+                posts.content as postingContent
+                FROM users
+                INNER JOIN posts 
+                WHERE posts.id = ${postingId} AND posts.user_id=users.id;
+            `,
+            (err, rows) => {
+                return res.status(200).json({ data: rows });
+            }
+        );
+    } catch (err) {
+        return res.status(409).json({ error: err.sqlMessage });
+    }
 });
 
 app.delete('/posts/:postId', async (req, res) => {
     const { postId } = req.params;
-
+    await database.query(
+        `DELETE FROM likes
+        WHERE post_id = ${postId}
+        `
+    );
     await database.query(
         `DELETE FROM posts
-		WHERE posts.id = ${postId}
+		WHERE id = ${postId}
 		`
     );
     res.status(200).json({ message: 'successfully deleted' });
 });
 
-app.post('/likes', async (req, res) => {
-    const { userId, postId } = req.body;
+app.post('/likes/:userId/:postId', async (req, res) => {
+    const { userId, postId } = req.params;
 
     await database.query(
         `SELECT *
             FROM likes WHERE user_id = ${userId} AND post_id = ${postId};
             `,
         async (err, rows) => {
-            console.log(rows);
             try {
                 if (rows.length === 0) {
                     await database.query(
@@ -199,7 +207,7 @@ app.post('/likes', async (req, res) => {
                             `,
                         [userId, postId]
                     );
-                    return res.status(201).json({ message: 'likeCreated' });
+                    return res.status(201).json({ message: 'like Created' });
                 } else {
                     throw 'already liked';
                 }
