@@ -30,30 +30,6 @@ app.get("/ping", (req, res) => {
   return res.status(200).json({ message: "pong" });
 });
 
-app.post("/auth", (req, res) => {
-  let username = req.body.username;
-  let password = req.body.password;
-  if (username && password) {
-    connection.query(
-      "SELECT * FROM accounts WHERE username = ? AND password = ?",
-      [username, password],
-      function (error, results, fields) {
-        if (error) throw error;
-        if (results.length > 0) {
-          request.session.loggedin = true;
-          request.session.username = username;
-          response.redirect("/home");
-        } else {
-          response.send("Incorrect Username and/or Password!");
-        }
-        response.end();
-      }
-    );
-  } else {
-    response.send("Please enter Username and Password!");
-    response.end();
-  }
-});
 const server = http.createServer(app);
 const PORT = process.env.PORT;
 
