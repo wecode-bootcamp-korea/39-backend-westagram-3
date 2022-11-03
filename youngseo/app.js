@@ -7,7 +7,6 @@ const morgan = require("morgan");
 const dotenv = require("dotenv");
 
 const { DataSource } = require('typeorm');
-const { title } = require("process");
 
 const appDataSource = new DataSource({
     type: process.env.TYPEORM_CONNECTION,
