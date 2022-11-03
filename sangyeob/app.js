@@ -6,7 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 
-const { DataSource } = require('typeorm');
+const { DataSource, Double } = require('typeorm');
 
 const database = new DataSource({
     type: process.env.TYPEORM_CONNECTION,
@@ -17,7 +17,8 @@ const database = new DataSource({
     database: process.env.TYPEORM_DATABASE,
 });
 
-database.initialize()
+database
+    .initialize()
     .then(() => {
         console.log('Data Source has been initialized!');
     })
@@ -39,7 +40,6 @@ app.post('/users', async (req, res) => {
     const { name, email, password, profileImage } = req.body;
 
     try {
-        await database.query(`ALTER TABLE users AUTO_INCREMENT=1;`);
         await database.query(
             `INSERT INTO users(
                 name,
@@ -65,11 +65,11 @@ app.post('/users', async (req, res) => {
     }
 });
 
+// 도배 처리 에러 추가 해야함
 app.post('/posts', async (req, res) => {
     const { title, content, contentImage, userId } = req.body;
 
     try {
-        await database.query(`ALTER TABLE users AUTO_INCREMENT=1;`);
         await database.query(
             `INSERT INTO posts(
                 title,
@@ -85,9 +85,133 @@ app.post('/posts', async (req, res) => {
         console.log(err.sqlMessage);
         if (err.sqlMessage.includes('foreign key constraint fails')) {
             return res.status(409).json({ error: 'no such user' });
+        } else {
+            return res.status(520).json({ error: err.sqlMessage });
         }
-        return res.status(520).json({ error: err.sqlMessage });
     }
+});
+
+app.get('/posts', async (req, res) => {
+    await database.query(
+        `SELECT
+            users.id as userId,
+            users.profile_image as userProfileImage,
+            posts.id as postingId,
+            posts.content_image as postingImageUrl,
+            posts.content as postingContent
+        FROM users
+        INNER JOIN posts ON posts.user_id = users.id
+        `,
+        (err, posts) => {
+            console.log(posts);
+            res.status(200).json(posts);
+        }
+    );
+});
+
+app.get('/users/posts', async (req, res) => {
+    const { userId } = req.body;
+
+    const obj = {};
+    obj.userId = userId;
+
+    let userProfileImage = await database.query(
+        `SELECT
+            profile_image
+        FROM users WHERE id = ${userId};
+        `
+    );
+    const { profile_image } = JSON.parse(JSON.stringify(userProfileImage[0]));
+
+    obj.userProfileImage = profile_image;
+
+    let postsbyUser = await database.query(
+        `SELECT
+            id as postingId,
+            content_image as postingImageUrl,
+            content as postingContent
+        FROM posts WHERE user_id = ${userId};
+        `
+    );
+
+    obj.postings = postsbyUser;
+    return res.status(200).json({ data: obj });
+});
+
+app.put('/posts', async (req, res) => {
+    const { postingId, postingTitle, postingContent, postingImage } = req.body;
+
+    await database.query(
+        `UPDATE posts
+            SET
+                title = ?,
+                content = ?,
+                content_image = ?
+                WHERE id = ?;
+        `,
+        [postingTitle, postingContent, postingImage, postingId]
+    );
+    await database.query(
+        `SELECT
+            users.id as userId,
+            users.name as userName,
+            posts.id as postingId,
+            posts.title as postingTitle,
+            posts.content as postingContent
+            FROM users
+            INNER JOIN posts 
+            WHERE posts.id = ${postingId} AND posts.user_id=users.id;
+        `,
+        (err, rows) => {
+            console.log(rows);
+            res.status(200).json({ data: rows });
+        }
+    );
+});
+
+app.delete('/posts/:postId', async (req, res) => {
+    const { postId } = req.params;
+
+    await database.query(
+        `DELETE FROM posts
+		WHERE posts.id = ${postId}
+		`
+    );
+    res.status(200).json({ message: 'successfully deleted' });
+});
+
+app.post('/likes', async (req, res) => {
+    const { userId, postId } = req.body;
+
+    await database.query(
+        `SELECT *
+            FROM likes WHERE user_id = ${userId} AND post_id = ${postId};
+            `,
+        async (err, rows) => {
+            console.log(rows);
+            try {
+                if (rows.length === 0) {
+                    await database.query(
+                        `INSERT INTO likes(
+                                user_id,
+                                post_id
+                            ) VALUES (?,?);
+                            `,
+                        [userId, postId]
+                    );
+                    return res.status(201).json({ message: 'likeCreated' });
+                } else {
+                    throw 'already liked';
+                }
+            } catch (err) {
+                if (err === 'already liked') {
+                    return res.status(409).json({ error: err });
+                } else {
+                    return res.status(520).json({ error: err.sqlMessage });
+                }
+            }
+        }
+    );
 });
 
 const server = http.createServer(app);
