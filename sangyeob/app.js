@@ -52,8 +52,42 @@ app.post('/users', async (req, res) => {
             [name, email, password, profileImage]
         );
         return res.status(201).json({ message: 'user successfully created' });
-    } catch {
-        return res.status(409).json({ message: 'user email is already taken' });
+    } catch (err) {
+        console.log(err.sqlMessage);
+        if (err.errno === 1048) {
+            return res.status(409).json({ error: 'invalid input' });
+        } else if (err.sqlMessage.includes('Duplicate entry')) {
+            return res
+                .status(409)
+                .json({ error: 'user email is already taken' });
+        } else {
+            return res.status(520).json({ error: err.sqlMessage });
+        }
+    }
+});
+
+app.post('/posts', async (req, res) => {
+    const { title, content, contentImage, userId } = req.body;
+
+    try {
+        await database.query(`ALTER TABLE users AUTO_INCREMENT=1;`);
+        await database.query(
+            `INSERT INTO posts(
+                title,
+                content,
+                content_image,
+                user_id
+            ) VALUES (?,?,?,?);
+            `,
+            [title, content, contentImage, userId]
+        );
+        return res.status(201).json({ message: 'post successfully created' });
+    } catch (err) {
+        console.log(err.sqlMessage);
+        if (err.sqlMessage.includes('foreign key constraint fails')) {
+            return res.status(409).json({ error: 'no such user' });
+        }
+        return res.status(520).json({ error: err.sqlMessage });
     }
 });
 
