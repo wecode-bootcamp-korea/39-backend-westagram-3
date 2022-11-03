@@ -7,7 +7,7 @@ CREATE TABLE users (
     profile_image VARCHAR(1000) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE (email)
+    CONSTRAINT users_email_ukey UNIQUE (email)
 );
 
 -- migrate:down

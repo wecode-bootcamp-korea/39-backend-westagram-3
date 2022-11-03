@@ -17,7 +17,6 @@ const database = new DataSource({
     database: process.env.TYPEORM_DATABASE,
 });
 
-// prettier-ignore
 database.initialize()
     .then(() => {
         console.log('Data Source has been initialized!');
