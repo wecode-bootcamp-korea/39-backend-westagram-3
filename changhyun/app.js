@@ -19,7 +19,7 @@ const appDataSource = new DataSource({
 
 appDataSource.initialize()
   .then(() => {
-      console.log("Data Source has been initialized!")
+    console.log("Data Source has been initialized!")
   })
   .catch((error) => {
     console.error(error);
@@ -36,10 +36,15 @@ app.get("/ping", function (req, res, next) {
 app.post('/create', async (req, res) => {
 	const { name, email, profile_image, password } = req.body
 	await appDataSource.query(
-		`INSERT INTO users(name,email,profile_image,password) VALUES (?, ?, ?, ?);`, [ name, email, profile_image, password ]
-	); 
+		`INSERT INTO users(
+      name,email,
+      profile_image,
+      password
+      ) VALUES (?, ?, ?, ?);
+      `,
+      [ name, email, profile_image, password ]
+    ); 
     res.status(201).json({ message : "userCreated" });
 	})
-
 
 app.listen(PORT, () => { console.log(`server listening on port ${PORT}`)});
