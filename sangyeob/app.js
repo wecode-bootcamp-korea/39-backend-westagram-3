@@ -35,6 +35,27 @@ app.get('/ping', (req, res) => {
     return res.status(200).json({ message: 'pong' });
 });
 
+app.post('/users', async (req, res) => {
+    const { name, email, password, profileImage } = req.body;
+
+    try {
+        await database.query(`ALTER TABLE users AUTO_INCREMENT=1;`);
+        await database.query(
+            `INSERT INTO users(
+                name,
+                email,
+                password,
+                profile_image
+            ) VALUES (?,?,?,?);
+            `,
+            [name, email, password, profileImage]
+        );
+        return res.status(201).json({ message: 'user successfully created' });
+    } catch {
+        return res.status(409).json({ message: 'user email is already taken' });
+    }
+});
+
 const server = http.createServer(app);
 const PORT = process.env.PORT;
 
