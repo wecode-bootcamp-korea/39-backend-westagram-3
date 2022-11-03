@@ -1,4 +1,3 @@
-//TODO 스테이터스코드체크, assignment 4부터 확인
 require('dotenv').config();
 
 const http = require('http');
@@ -101,7 +100,7 @@ app.get('/posts', async (req, res) => {
         INNER JOIN posts ON posts.user_id = users.id
         `,
         (err, posts) => {
-            res.status(200).json(posts);
+            return res.status(200).json(posts);
         }
     );
 });
@@ -114,8 +113,9 @@ app.get('/users/:userId/posts', async (req, res) => {
     try {
         let userProfileImage = await database.query(
             `SELECT
-            profile_image
-            FROM users WHERE id = ${userId};
+                profile_image
+            FROM users 
+            WHERE id = ${userId};
             `
         );
         const { profile_image } = JSON.parse(
@@ -126,10 +126,11 @@ app.get('/users/:userId/posts', async (req, res) => {
 
         let postsbyUser = await database.query(
             `SELECT
-            id as postingId,
-            content_image as postingImageUrl,
-            content as postingContent
-            FROM posts WHERE user_id = ${userId};
+                id as postingId,
+                content_image as postingImageUrl,
+                content as postingContent
+            FROM posts 
+            WHERE user_id = ${userId};
             `
         );
 
@@ -161,9 +162,9 @@ app.put('/posts', async (req, res) => {
                 posts.id as postingId,
                 posts.title as postingTitle,
                 posts.content as postingContent
-                FROM users
-                INNER JOIN posts 
-                WHERE posts.id = ${postingId} AND posts.user_id=users.id;
+            FROM users
+            INNER JOIN posts 
+            WHERE posts.id = ${postingId} AND posts.user_id=users.id;
             `,
             (err, rows) => {
                 return res.status(200).json({ data: rows });
@@ -186,7 +187,7 @@ app.delete('/posts/:postId', async (req, res) => {
 		WHERE id = ${postId}
 		`
     );
-    res.status(200).json({ message: 'successfully deleted' });
+    return res.status(200).json({ message: 'successfully deleted' });
 });
 
 app.post('/likes/:userId/:postId', async (req, res) => {
@@ -194,7 +195,8 @@ app.post('/likes/:userId/:postId', async (req, res) => {
 
     await database.query(
         `SELECT *
-            FROM likes WHERE user_id = ${userId} AND post_id = ${postId};
+            FROM likes 
+            WHERE user_id = ${userId} AND post_id = ${postId};
             `,
         async (err, rows) => {
             try {
