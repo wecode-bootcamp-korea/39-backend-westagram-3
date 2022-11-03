@@ -17,12 +17,12 @@ const mysqlDataSource = new DataSource({
   database: process.env.TYPEORM_DATABASE,
 });
 
-myDataSource.initialize()
+mysqlDataSource.initialize()
   .then(() => {
   console.log("Data Source has been initialized!");
   })
   .catch((err)=>{
-    console.log("Error during Data Source initialization",err)
+  console.log("Error during Data Source initialization",err)
   })
 
 const app = express();
