@@ -140,6 +140,17 @@ app.patch("/post/:userId/:postId", async (req, res, next) => {
   );
 });
 
+app.delete("/post/:id", async (req, res, next) => {
+  const { id } = req.params;
+  await appDataSource.query(
+    `DELETE 
+      FROM posts
+      WHERE id = ${id};
+    `
+  );
+  res.status(200).json({ message: "postingDeleted" });
+});
+
 app.listen(PORT, () => {
   console.log(`server listening on port ${PORT}`);
 });
