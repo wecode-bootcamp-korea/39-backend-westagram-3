@@ -110,9 +110,8 @@ app.get("/posts/:userId", async (req, res) => {
 });
 
 
-app.patch("/posts/:userId/:postId", async (req, res) => {
-    const { title, content} = req.body
-    const userid = req.params.userId
+app.patch("/posts/:postId", async (req, res) => {
+    const { title, content } = req.body
     const postid = req.params.postId
 
     await appDataSource.query(
@@ -134,12 +133,35 @@ app.patch("/posts/:userId/:postId", async (req, res) => {
             posts.content AS postingContent
         FROM users 
         INNER JOIN posts ON users.id = posts.user_id
-        WHERE users.id = ${userid} AND posts.id = ${postid}`
+        WHERE posts.id = ${postid}`
         );
     res.status(200).json({data: result});
 });
 
+app.delete("/posts/:postId", async (req,res) => {
+    const postid = req.params.postId
 
+    await appDataSource.query(
+        `DELETE FROM posts 
+        WHERE posts.id = ${postid}`
+    );
+
+   res.status(200).json({ message : "postingDeleted"});
+});
+
+app.post("/likes", async (req, res) => {
+    const {user_id, post_id} = req.body
+
+    await appDataSource.query(
+        `INSERT INTO likes(
+            user_id,
+            post_id
+        ) VALUES (?,?);
+        `,
+        [user_id, post_id]
+    );
+  res.status(201).json({ message: "likeCreated" });
+});
 
 const server = http.createServer(app)
 const PORT = process.env.PORT
