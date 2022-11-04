@@ -8,7 +8,7 @@ const morgan = require('morgan');
 const { DataSource } = require('typeorm');
 
 const api = require('./../api');
-const AppDataSource = new DataSource({
+const appDataSource = new DataSource({
   type: process.env.TYPEORM_CONNECTION,
   host: process.env.TYPEORM_HOST,
   port: process.env.TYPEORM_PORT,
@@ -17,7 +17,8 @@ const AppDataSource = new DataSource({
   database: process.env.TYPEORM_DATABASE,
 });
 
-AppDataSource.initialize()
+appDataSource
+  .initialize()
   .then(() => {
     console.log('Data Source has been initialized!');
   })
