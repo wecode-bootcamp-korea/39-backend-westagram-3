@@ -64,6 +64,46 @@ app.post("/post", async (req, res) => {
   res.status(201).json({ message: "postCreated" });
 });
 
+app.get("/posts/view", async (req, res) => {
+  await appDataSource.query(
+    `SELECT
+      users.id as userID,
+      users.profile_image as userProfileImage,
+      posts.id as postingId,
+      posts.image as postingImageUrl,
+      posts.content as postingContent
+      FROM users 
+      INNER JOIN posts ON posts.user_id = users.id;
+      `,
+    (err, rows) => {
+      res.status(200).json({ data: rows });
+    }
+  );
+});
+
+app.get("/user/post", async (req, res) => {
+  const { id } = req.body;
+  const userInfo = await appDataSource.query(
+    `SELECT
+      users.id as userID,
+      users.profile_image as userProfileImage
+      FROM users
+      WHERE users.id = ${id};
+    `
+  );
+  const userPost = await appDataSource.query(
+    `SELECT
+      posts.id as postingId,
+      posts.image as postingImageUrl,
+      posts.content as postingContent
+      FROM posts
+      WHERE posts.user_id = ${id};
+    `
+  );
+  userInfo[0]["postings"] = userPost;
+  res.status(200).json({ data: userInfo });
+});
+
 app.listen(PORT, () => {
   console.log(`server listening on port ${PORT}`);
 });
