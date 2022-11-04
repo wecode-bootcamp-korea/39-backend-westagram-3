@@ -31,13 +31,14 @@ app.use(express.json());
 
 app.get("/ping", function (req, res, next) {
   return res.status(200).json({ message : "pong" });
-})
+});
 
-app.post('/create', async (req, res) => {
+app.post('/user', async (req, res) => {
 	const { name, email, profile_image, password } = req.body
 	await appDataSource.query(
 		`INSERT INTO users(
-      name,email,
+      name,
+      email,
       profile_image,
       password
       ) VALUES (?, ?, ?, ?);
@@ -45,6 +46,6 @@ app.post('/create', async (req, res) => {
       [ name, email, profile_image, password ]
     ); 
     res.status(201).json({ message : "userCreated" });
-	})
+	});
 
 app.listen(PORT, () => { console.log(`server listening on port ${PORT}`)});
