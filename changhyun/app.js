@@ -49,6 +49,21 @@ app.post("/user", async (req, res) => {
   res.status(201).json({ message: "userCreated" });
 });
 
+app.post("/post", async (req, res) => {
+  const { title, content, image, user_id } = req.body;
+  await appDataSource.query(
+    `INSERT INTO posts(
+      title,
+      content,
+      image,
+      user_id
+      ) VALUES (?, ?, ?, ?);
+      `,
+    [title, content, image, user_id]
+  );
+  res.status(201).json({ message: "postCreated" });
+});
+
 app.listen(PORT, () => {
   console.log(`server listening on port ${PORT}`);
 });
