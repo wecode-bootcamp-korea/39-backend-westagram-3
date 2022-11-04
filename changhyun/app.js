@@ -49,17 +49,33 @@ app.post('/create', async (req, res) => {
 	});
 
 app.post('/post', async (req, res) => {
-  const { title, content, user_id } = req.body
+  const { title, content, image, user_id } = req.body
   await appDataSource.query(
     `INSERT INTO posts(
       title,
       content,
+      image,
       user_id
-      ) VALUES (?, ?, ?);
+      ) VALUES (?, ?, ?, ?);
       `,
-      [ title, content, user_id ]
+      [ title, content, image, user_id ]
     ); 
     res.status(201).json({ message : "postCreated" });
   });
+
+app.get('/posts/view', async (req, res) => {
+  await appDataSource.query(
+    `SELECT
+      users.id as userID,
+      users.profile_image as userProfileImage,
+      posts.id as postingId,
+      posts.image as postingImageUrl,
+      posts.content as postingContent
+      FROM users 
+      INNER JOIN posts ON posts.user_id = users.id;
+      `, (err, rows) => {
+        res.status(200).json({data : rows});
+    })
+});
 
 app.listen(PORT, () => { console.log(`server listening on port ${PORT}`)});
