@@ -50,7 +50,8 @@ app.post("/users/signup", async (req, res) => {
         `,
         [ name, email, password, profile_image]
     ); 
-    res.status(201).json({ message: "userCreated" });
+
+    return res.status(201).json({ message: "userCreated" });
 });
 
 app.post("/posts", async (req, res) => {
@@ -66,7 +67,8 @@ app.post("/posts", async (req, res) => {
         `,
         [ title, content, content_image, user_id ]
     ); 
-    res.status(201).json({ message: "postCreated" });
+
+    return res.status(201).json({ message: "postCreated" });
 });
 
 app.get("/posts", async(req, res) => {
@@ -80,20 +82,22 @@ app.get("/posts", async(req, res) => {
         FROM users 
         INNER JOIN posts ON users.id = posts.user_id`
             ,(err, rows) => {
-        res.status(200).json({data:rows});
+        return res.status(200).json({data:rows});
             });
 });
 
 
-app.get("/posts/:userId", async (req, res) => {
-    const userid = req.params.userId
+app.get("/users/:userId/posts", async (req, res) => {
+    const userId = req.params.userId
 
     const [user] = await appDataSource.query(
         `SELECT 
             users.id AS userId,
             users.profile_image AS userProfileImage
         FROM users
-        WHERE users.id = ${userid}`);
+        WHERE users.id = ?
+        `, [userId]
+    );
     
     const posts = await appDataSource.query(
         `SELECT 
@@ -102,26 +106,28 @@ app.get("/posts/:userId", async (req, res) => {
             posts.content AS postigContent
         FROM posts
         INNER JOIN users ON users.id = posts.user_id
-        WHERE users.id = ${userid}`);
+        WHERE users.id = ?
+        `, [userId]
+     );
 
     user['postings'] = posts;
 
-    res.status(200).json({ data: user })
+    return res.status(200).json({ data: user })
 });
 
 
 app.patch("/posts/:postId", async (req, res) => {
     const { title, content } = req.body
-    const postid = req.params.postId
+    const postId = req.params.postId
 
     await appDataSource.query(
         `UPDATE posts 
         SET 
             posts.title = ?, 
             posts.content = ?
-        WHERE posts.id = ${postid}
+        WHERE posts.id = ?
         `,
-        [ title, content ]
+        [ title, content, postId ]
     ); 
 
     const [result] = await appDataSource.query(
@@ -133,34 +139,40 @@ app.patch("/posts/:postId", async (req, res) => {
             posts.content AS postingContent
         FROM users 
         INNER JOIN posts ON users.id = posts.user_id
-        WHERE posts.id = ${postid}`
-        );
-    res.status(200).json({data: result});
+        WHERE posts.id = ?
+        `, [postId]
+    );
+
+    return res.status(200).json({data: result});
 });
 
 app.delete("/posts/:postId", async (req,res) => {
-    const postid = req.params.postId
+    const postId = req.params.postId
 
     await appDataSource.query(
         `DELETE FROM posts 
-        WHERE posts.id = ${postid}`
+        WHERE posts.id = ?
+        `, [postId]
     );
 
-   res.status(200).json({ message : "postingDeleted"});
+   return res.status(200).json({ message : "postingDeleted"});
 });
 
 app.post("/likes", async (req, res) => {
     const {user_id, post_id} = req.body
 
-    await appDataSource.query(
+    try {
+        await appDataSource.query(
         `INSERT INTO likes(
             user_id,
             post_id
         ) VALUES (?,?);
-        `,
-        [user_id, post_id]
+        `, [user_id, post_id]
     );
-  res.status(201).json({ message: "likeCreated" });
+  return res.status(201).json({ message: "likeCreated" })
+} catch (err) {
+    return res.status(409).json({ error: err.sqlMessage });
+}
 });
 
 const server = http.createServer(app)
