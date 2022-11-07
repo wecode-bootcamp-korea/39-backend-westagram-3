@@ -52,6 +52,90 @@ app.post("/users/signup", async (req, res) => {
   return res.status(201).json({ message: "successfully created" });
 });
 
+app.post("/posts", async (req, res) => {
+  const { title, content, content_image, user_id } = req.body;
+
+  await mysqlDataSource.query(
+    `INSERT INTO posts(
+      title,
+      content,
+      content_image,
+      user_id
+    ) VALUES (?, ?, ?, ?);
+    `,
+    [title, content, content_image, user_id]
+  );
+  return res.status(201).json({ message: "successfully created" });
+});
+
+app.get("/posts/:userId/posts", async (req, res) => {
+  const { userId } = req.params;
+
+  const postingThings = await mysqlDataSource.query(
+    `
+    SELECT
+      posts.id AS postingId,
+      posts.content_image AS postingImageUrl,
+      posts.content AS postingContent
+    FROM posts
+    INNER JOIN users ON users.id = posts.user_id
+    WHERE users.id = ?
+    `,
+    [userId]
+  );
+  const [result] = await mysqlDataSource.query(
+    `
+    SELECT
+      users.id AS userId,
+      users.profile_image AS userProfileImage
+    FROM users
+    WHERE users.id = ?
+    `,
+    [userId]
+  );
+
+  result["postings"] = postingThings;
+  return res.status(200).json({ data: result });
+});
+
+app.patch("/posts/:postId", async (req, res) => {
+  const { content } = req.body;
+  const { postId } = req.params;
+
+  await mysqlDataSource.query(
+    `UPDATE posts
+     SET posts.content =?
+     WHERE posts.id = ?
+    `,
+    [content, postId]
+  );
+  const result = await mysqlDataSource.query(
+    `
+    SELECT
+      users.id AS userId,
+      users.name AS userName,
+      posts.id AS postingName,
+      posts.title AS postingTitle,
+      posts.content AS postingContent
+    FROM posts
+    INNER JOIN users ON users.id = posts.user_id
+    WHERE posts.id = ${postId}
+    `
+  );
+  return res.status(201).json({ data: result });
+});
+
+app.delete("/posts/:postId", async (req, res) => {
+  const { postId } = req.params;
+
+  await mysqlDataSource.query(
+    `DELETE FROM posts
+      WHERE posts.id = ${postId}
+      `
+  );
+  return res.status(200).json({ message: "postingDeleted" });
+});
+
 const server = http.createServer(app);
 const PORT = process.env.PORT;
 
