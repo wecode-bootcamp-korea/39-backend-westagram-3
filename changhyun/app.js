@@ -149,8 +149,8 @@ app.delete("/post/:postId", async (req, res, next) => {
   res.status(200).json({ message: "postingDeleted" });
 });
 
-app.post("/like/:userId/:postId", async (req, res, next) => {
-  const { userId, postId } = req.params;
+app.post("/likes", async (req, res, next) => {
+  const { userId, postId } = req.body;
   await appDataSource.query(
     `INSERT INTO likes(
       user_id,
