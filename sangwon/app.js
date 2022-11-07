@@ -65,15 +65,10 @@ app.post("/posts", async (req, res) => {
     `,
     [title, content, content_image, user_id]
   );
-  await mysqlDataSource.query(
-    `DELETE FROM posts
-      WHERE posts.id = ${postId}
-      `
-  );
   return res.status(201).json({ message: "successfully created" });
 });
 
-app.get("/posts/:userId", async (req, res) => {
+app.get("/posts/:userId/posts", async (req, res) => {
   const { userId } = req.params;
 
   const postingThings = await mysqlDataSource.query(
@@ -84,8 +79,9 @@ app.get("/posts/:userId", async (req, res) => {
       posts.content AS postingContent
     FROM posts
     INNER JOIN users ON users.id = posts.user_id
-    WHERE users.id = ${userId}
-    `
+    WHERE users.id = ?
+    `,
+    [userId]
   );
   const [result] = await mysqlDataSource.query(
     `
@@ -93,8 +89,9 @@ app.get("/posts/:userId", async (req, res) => {
       users.id AS userId,
       users.profile_image AS userProfileImage
     FROM users
-    WHERE users.id = ${userId}
-        `
+    WHERE users.id = ?
+    `,
+    [userId]
   );
 
   result["postings"] = postingThings;
@@ -108,9 +105,9 @@ app.patch("/posts/:postId", async (req, res) => {
   await mysqlDataSource.query(
     `UPDATE posts
      SET posts.content =?
-     WHERE posts.id = ${postId}
+     WHERE posts.id = ?
     `,
-    [content]
+    [content, postId]
   );
   const result = await mysqlDataSource.query(
     `
