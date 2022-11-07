@@ -46,7 +46,7 @@ app.post('/users', async (req, res) => {
     `,
     [name, email, profile_image, password]
   );
-  res.status(201).json({ message: 'userCreated' });
+  return res.status(201).json({ message: 'userCreated' });
 });
 
 const server = http.createServer(app);
