@@ -71,40 +71,21 @@ app.post("/posts", async (req, res) => {
 app.post("/likes", async (req, res) => {
   const { userId, postId } = req.body;
 
-  const [check] = await mysqlDataSource.query(
-    `
-    SELECT 
-    id,
+  try {
+    await mysqlDataSource.query(
+      `INSERT INTO likes(
     user_id,
     post_id
-    FROM likes
-    WHERE user_id = ? AND post_id =?
-    `,
-    [userId, postId]
-  );
-  console.log(check);
-  try {
-    if (check.length === 0) {
-      await mysqlDataSource.query(
-        `INSERT INTO likes(
-        user_id,
-        post_id
-    ) VALUES(?,?)
-    `,
-        [userId, postId]
-      );
-      return res.status(201).json({ message: "successfully liked" });
-    } else {
-      throw "already liked";
-    }
+) VALUES(?,?)
+`,
+      [userId, postId]
+    );
+    return res.status(201).json({ message: "successfully liked" });
   } catch (err) {
-    if (err === "already liked") {
-      return res.status(409).json({ error: err });
-    } else {
-      return res.status(520).json({ error: "Invalid input" });
-    }
+    return res.status(409).json({ error: "already liked" });
   }
 });
+
 app.get("/posts/:userId/posts", async (req, res) => {
   const { userId } = req.params;
 
