@@ -6,7 +6,8 @@ CREATE TABLE users (
     password VARCHAR(200) NOT NULL,
     profile_image VARCHAR(1000) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT users_email_unq UNIQUE (email)
 );
 -- migrate:down
 DROP TABLE users
