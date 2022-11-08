@@ -68,6 +68,24 @@ app.post("/posts", async (req, res) => {
   return res.status(201).json({ message: "successfully created" });
 });
 
+app.post("/likes", async (req, res) => {
+  const { userId, postId } = req.body;
+
+  try {
+    await mysqlDataSource.query(
+      `INSERT INTO likes(
+    user_id,
+    post_id
+) VALUES(?,?)
+`,
+      [userId, postId]
+    );
+    return res.status(201).json({ message: "successfully liked" });
+  } catch (err) {
+    return res.status(409).json({ error: "already liked" });
+  }
+});
+
 app.get("/posts/:userId/posts", async (req, res) => {
   const { userId } = req.params;
 
