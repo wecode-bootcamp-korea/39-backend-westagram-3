@@ -5,6 +5,8 @@ const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const { DataSource } = require('typeorm');
 
@@ -37,6 +39,10 @@ app.get('/ping', (req, res) => {
 
 app.post('/users', async (req, res) => {
     const { name, email, password, profileImage } = req.body;
+    const hashedpassword = await bcrypt.hash(
+        password,
+        parseInt(process.env.BCRYPT_SALT)
+    );
 
     try {
         await database.query(
@@ -47,7 +53,7 @@ app.post('/users', async (req, res) => {
                 profile_image
             ) VALUES (?,?,?,?);
             `,
-            [name, email, password, profileImage]
+            [name, email, hashedpassword, profileImage]
         );
         return res.status(201).json({ message: 'user successfully created' });
     } catch (err) {
@@ -64,9 +70,12 @@ app.post('/users', async (req, res) => {
 });
 
 app.post('/posts', async (req, res) => {
-    const { title, content, contentImage, userId } = req.body;
+    const { title, content, contentImage } = req.body;
+    const token = req.headers.authorization;
 
     try {
+        const decodedToken = await jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decodedToken.id;
         await database.query(
             `INSERT INTO posts(
                 title,
@@ -79,10 +88,10 @@ app.post('/posts', async (req, res) => {
         );
         return res.status(201).json({ message: 'post successfully created' });
     } catch (err) {
-        if (err.sqlMessage.includes('foreign key constraint fails')) {
-            return res.status(409).json({ error: 'no such user' });
+        if (err.message === 'invalid signature') {
+            return res.status(401).json({ error: 'unauthorized token' });
         } else {
-            return res.status(520).json({ error: 'unknown error' });
+            return res.status(520).json({ error: 'invalid input' });
         }
     }
 });
@@ -196,25 +205,45 @@ app.post('/likes', async (req, res) => {
     );
 
     try {
-        if (rows.length === 0) {
-            await database.query(
-                `INSERT INTO likes(
+        await database.query(
+            `INSERT INTO likes(
                     user_id,
                     post_id
                 ) VALUES (?,?);
                 `,
-                [userId, postId]
-            );
-            return res.status(201).json({ message: 'like Created' });
+            [userId, postId]
+        );
+
+        return res.status(201).json({ message: 'like Created' });
+    } catch (err) {
+        return res.status(520).json({ error: 'Invalid input' });
+    }
+});
+
+app.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const rows = await database.query(
+            `SELECT email,password,id
+                FROM users
+                WHERE email = ?;
+            `,
+            [email]
+        );
+        if (rows.length < 1) {
+            throw 'invalid email';
+        } else if (!(await bcrypt.compare(password, rows[0].password))) {
+            throw 'invalid password';
         } else {
-            throw 'already liked';
+            const token = await jwt.sign(
+                { email: rows[0].email, id: rows[0].id },
+                process.env.JWT_SECRET,
+                { expiresIn: '7d' }
+            );
+            return res.status(200).json({ accessToken: token });
         }
     } catch (err) {
-        if (err === 'already liked') {
-            return res.status(409).json({ error: err });
-        } else {
-            return res.status(520).json({ error: 'Invalid input' });
-        }
+        return res.status(401).json({ message: 'Invalid email or password' });
     }
 });
 
