@@ -35,8 +35,10 @@ app.get("/ping", function (req, res, next) {
   return res.status(200).json({ message: "pong" });
 });
 
-app.post("/user/info", async (req, res, next) => {
+app.post("/users", async (req, res, next) => {
   const { name, email, profileImage, password } = req.body;
+  const saltRounds = 12;
+  const Hash = await bcrypt.hash(password, saltRounds);
   await appDataSource.query(
     `INSERT INTO users(
       name,
@@ -45,7 +47,7 @@ app.post("/user/info", async (req, res, next) => {
       password
     ) VALUES (?, ?, ?, ?);
     `,
-    [name, email, profileImage, password]
+    [name, email, profileImage, Hash]
   );
   res.status(201).json({ message: "userCreated" });
 });
