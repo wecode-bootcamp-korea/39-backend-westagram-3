@@ -5,6 +5,15 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
+const bcrypt = require("bcrypt");
+const jwt = require('jsonwebtoken');
+const secretKey = process.env.SECRET_KEY;
+
+// const router = express.Router();
+// const { postController } = require("../controllers");
+// router.post("", postController.createPost);
+//import { validateToken } from '../youngseo/middlewares/auth'
+// module.exports = router;
 
 const { DataSource } = require('typeorm');
 
@@ -14,7 +23,7 @@ const appDataSource = new DataSource({
     port: process.env.TYPEORM_PORT,
     username: process.env.TYPEORM_USERNAME,
     password: process.env.TYPEORM_PASSWORD,
-    database: process.env.TYPEORM_DATABASE
+    database: process.env.TYPEORM_DATABASE,
 })
 
 appDataSource.initialize()
@@ -39,6 +48,13 @@ app.get("/ping", (req,res) => {
 
 app.post("/users/signup", async (req, res) => {
     const { name, email, password, profile_image } = req.body
+    const saltRounds = 12;
+
+    const makeHash = async (password, saltRounds) => {
+        return await bcrypt.hash(password, saltRounds);
+    }
+    
+    const hashedPassword = await makeHash(password, saltRounds);
 
     await appDataSource.query(
         `INSERT INTO users(
@@ -48,11 +64,40 @@ app.post("/users/signup", async (req, res) => {
             profile_image
         ) VALUES (?, ?, ?, ?);
         `,
-        [ name, email, password, profile_image]
+        [ name, email, hashedPassword, profile_image]
     ); 
 
     return res.status(201).json({ message: "userCreated" });
 });
+
+app.post("/users/login", async (req, res) => {
+    const { email, password } = req.body
+
+    const [userInfo] = await appDataSource.query(
+        `SELECT 
+            users.email,
+            users.password
+        FROM users
+        WHERE users.email = ?
+        `, [email]
+    );
+
+    const checkHash = async (password, hashedPassword) => {
+        return await bcrypt.compare(password, hashedPassword)
+    }
+
+    if (await checkHash(password, userInfo.password)) {
+        const payLoad = { 
+            email : email,
+            password : userInfo.password
+        };
+        const jwtToken = jwt.sign(payLoad,secretKey);
+        return res.status(201).json({accessToken: jwtToken });
+    } else {
+        return res.status(409).json({ message : "Invalid User" });
+    }
+
+})
 
 app.post("/posts", async (req, res) => {
     const { title, content, content_image, user_id } = req.body
