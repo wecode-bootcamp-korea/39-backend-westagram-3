@@ -7,7 +7,6 @@ const cors = require('cors');
 const morgan = require('morgan');
 const { DataSource } = require('typeorm');
 
-const api = require('./../api');
 const appDataSource = new DataSource({
   type: process.env.TYPEORM_CONNECTION,
   host: process.env.TYPEORM_HOST,
@@ -47,6 +46,48 @@ app.post('/users', async (req, res) => {
     [name, email, profile_image, password]
   );
   return res.status(201).json({ message: 'userCreated' });
+});
+
+app.post('/posts', async (req, res) => {
+  const { title, content, userId } = req.body;
+  await myDataSource.query(
+    `INSERT INTO posts(
+      title,
+      content,
+      user_id
+    ) VALUES (?, ?, ?);
+    `,
+    [title, content, userId]
+  );
+  return res.status(201).json({ message: 'postCreated' });
+});
+
+app.get('/posts', async (req, res) => {
+  const posts = await myDataSource.query(
+    `SELECT(
+    users.id AS userId,
+    users.profile_image AS userProfileImage,
+    posts.id AS postingId,
+    posts.content_image AS postingImageUrl,
+    posts.content AS postingContent
+    FROM users
+    INNER JOIN posts ON users.id = posts.user_id
+  )`
+  );
+  return res.status(200).json({ data: posts });
+});
+
+app.post('/likes', async (req, res) => {
+  const { user_id, post_id } = req.body;
+  await myDataSource.query(
+    `INSERT INTO likes(
+      user_id
+      post_id
+    ) VALUES (?, ?);
+    `,
+    [user_id, post_id]
+  );
+  return res.status(201).json({ message: 'likeCreated' });
 });
 
 const server = http.createServer(app);
