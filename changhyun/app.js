@@ -3,9 +3,11 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
-const { DataSource, SimpleConsoleLogger } = require("typeorm");
-const app = express();
+const { DataSource } = require("typeorm");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+
+const app = express();
 
 const PORT = process.env.PORT;
 
@@ -37,8 +39,8 @@ app.get("/ping", function (req, res) {
 
 app.post("/users", async (req, res) => {
   const { name, email, profileImage, password } = req.body;
-  const saltRounds = 12;
-  const Hash = await bcrypt.hash(password, saltRounds);
+  const saltRounds = 8;
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
   await appDataSource.query(
     `INSERT INTO users(
       name,
@@ -47,9 +49,34 @@ app.post("/users", async (req, res) => {
       password
     ) VALUES (?, ?, ?, ?);
     `,
-    [name, email, profileImage, Hash]
+    [name, email, profileImage, hashedPassword]
   );
   res.status(201).json({ message: "userCreated" });
+});
+
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  const usersIdAndHashedPassword = await appDataSource.query(
+    `SELECT id, password
+    FROM users
+    WHERE users.email = ?
+    `,
+    [email]
+  );
+
+  const compareResult = await bcrypt.compare(
+    password,
+    usersIdAndHashedPassword[0]["password"]
+  );
+
+  if (compareResult) {
+    const payLoad = { id: usersIdAndHashedPassword[0]["id"] };
+    const secretKey = process.env.MY_SECRET_KEY;
+    const jwtToken = jwt.sign(payLoad, secretKey, { expiresIn: "1d" });
+    res.status(201).json({ message: jwtToken });
+  } else {
+    res.status(404).json({ message: "Invalid User" });
+  }
 });
 
 app.post("/post", async (req, res) => {
@@ -157,7 +184,9 @@ app.post("/likes", async (req, res) => {
   const rows = await appDataSource.query(
     `SELECT *
     FROM likes
-    WHERE user_id = ${userId} and post_id = ${postId}`
+    WHERE user_id = ? and post_id = ?
+    `,
+    [userId, postId]
   );
   if (rows.length === 0) {
     await appDataSource.query(
