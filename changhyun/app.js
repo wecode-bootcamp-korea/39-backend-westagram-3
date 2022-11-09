@@ -4,6 +4,9 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const { DataSource } = require("typeorm");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+
 const app = express();
 
 const PORT = process.env.PORT;
@@ -30,12 +33,14 @@ app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json());
 
-app.get("/ping", function (req, res, next) {
+app.get("/ping", function (req, res) {
   return res.status(200).json({ message: "pong" });
 });
 
-app.post("/user/info", async (req, res, next) => {
+app.post("/users", async (req, res) => {
   const { name, email, profileImage, password } = req.body;
+  const saltRounds = 8;
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
   await appDataSource.query(
     `INSERT INTO users(
       name,
@@ -44,27 +49,65 @@ app.post("/user/info", async (req, res, next) => {
       password
     ) VALUES (?, ?, ?, ?);
     `,
-    [name, email, profileImage, password]
+    [name, email, profileImage, hashedPassword]
   );
   res.status(201).json({ message: "userCreated" });
 });
-
-app.post("/post", async (req, res, next) => {
-  const { title, content, imageUrl, userId } = req.body;
-  await appDataSource.query(
-    `INSERT INTO posts(
-      title,
-      content,
-      image_url,
-      user_id
-    ) VALUES (?, ?, ?, ?);
-      `,
-    [title, content, imageUrl, userId]
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  const usersIdAndHashedPassword = await appDataSource.query(
+    `SELECT id, password
+    FROM users
+    WHERE users.email = ?;
+    `,
+    [email]
   );
-  res.status(201).json({ message: "postCreated" });
+  const compareResult = await bcrypt.compare(
+    password,
+    usersIdAndHashedPassword[0]["password"]
+  );
+  if (compareResult) {
+    const payLoad = { id: usersIdAndHashedPassword[0]["id"] };
+    const secretKey = process.env.MY_SECRET_KEY;
+    const jwtToken = jwt.sign(payLoad, secretKey, { expiresIn: "1d" });
+    res.status(201).json({ message: jwtToken });
+  } else {
+    res.status(404).json({ message: "Invalid User" });
+  }
 });
 
-app.get("/posts", async (req, res, next) => {
+app.post("/post", async (req, res) => {
+  try {
+    const jwtToken = req.headers.token;
+    const { title, content, imageUrl, email } = req.body;
+    const secretKey = process.env.MY_SECRET_KEY;
+    const decoded = await jwt.verify(jwtToken, secretKey);
+    if (decoded) {
+      const userId = await appDataSource.query(
+        `SELECT id
+      FROM users
+      WHERE users.email = ?;
+      `,
+        [email]
+      );
+      await appDataSource.query(
+        `INSERT INTO posts(
+        title,
+        content,
+        image_url,
+        user_id
+      ) VALUES (?, ?, ?, ?);
+        `,
+        [title, content, imageUrl, userId[0]["id"]]
+      );
+      res.status(201).json({ message: "postCreated" });
+    }
+  } catch (err) {
+    res.status(404).json({ message: "Invalid User" });
+  }
+});
+
+app.get("/posts", async (req, res) => {
   await appDataSource.query(
     `SELECT
       users.id as userID,
@@ -82,7 +125,7 @@ app.get("/posts", async (req, res, next) => {
   );
 });
 
-app.get("/users/:userId/posts", async (req, res, next) => {
+app.get("/users/:userId/posts", async (req, res) => {
   const { userId } = req.params;
   const userInfo = await appDataSource.query(
     `SELECT
@@ -107,7 +150,7 @@ app.get("/users/:userId/posts", async (req, res, next) => {
   res.status(200).json({ data: userInfo });
 });
 
-app.patch("/post/:userId/:postId", async (req, res, next) => {
+app.patch("/post/:userId/:postId", async (req, res) => {
   const { userId, postId } = req.params;
   const { content } = req.body;
   await appDataSource.query(
@@ -137,7 +180,7 @@ app.patch("/post/:userId/:postId", async (req, res, next) => {
   };
 });
 
-app.delete("/post/:postId", async (req, res, next) => {
+app.delete("/post/:postId", async (req, res) => {
   const { postId } = req.params;
   await appDataSource.query(
     `DELETE 
@@ -149,16 +192,33 @@ app.delete("/post/:postId", async (req, res, next) => {
   res.status(200).json({ message: "postingDeleted" });
 });
 
-app.post("/likes", async (req, res, next) => {
+app.post("/likes", async (req, res) => {
   const { userId, postId } = req.body;
-  await appDataSource.query(
-    `INSERT INTO likes(
-      user_id,
-      post_id
-    ) VALUES (?, ?);
+  const rows = await appDataSource.query(
+    `SELECT *
+    FROM likes
+    WHERE user_id = ? and post_id = ?;
     `,
     [userId, postId]
   );
+  if (rows.length === 0) {
+    await appDataSource.query(
+      `INSERT INTO likes(
+        user_id,
+        post_id
+      ) VALUES (?, ?);
+      `,
+      [userId, postId]
+    );
+  } else {
+    await appDataSource.query(
+      `DELETE
+        FROM likes
+        WHERE user_id = ? and post_id = ?;
+      `,
+      [userId, postId]
+    );
+  }
   res.status(201).json({ message: "likeCreated" });
 });
 
