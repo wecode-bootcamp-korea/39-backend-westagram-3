@@ -53,22 +53,19 @@ app.post("/users", async (req, res) => {
   );
   res.status(201).json({ message: "userCreated" });
 });
-
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
   const usersIdAndHashedPassword = await appDataSource.query(
     `SELECT id, password
     FROM users
-    WHERE users.email = ?
+    WHERE users.email = ?;
     `,
     [email]
   );
-
   const compareResult = await bcrypt.compare(
     password,
     usersIdAndHashedPassword[0]["password"]
   );
-
   if (compareResult) {
     const payLoad = { id: usersIdAndHashedPassword[0]["id"] };
     const secretKey = process.env.MY_SECRET_KEY;
@@ -80,18 +77,34 @@ app.post("/login", async (req, res) => {
 });
 
 app.post("/post", async (req, res) => {
-  const { title, content, imageUrl, userId } = req.body;
-  await appDataSource.query(
-    `INSERT INTO posts(
-      title,
-      content,
-      image_url,
-      user_id
-    ) VALUES (?, ?, ?, ?);
+  try {
+    const jwtToken = req.headers.token;
+    const { title, content, imageUrl, email } = req.body;
+    const secretKey = process.env.MY_SECRET_KEY;
+    const decoded = await jwt.verify(jwtToken, secretKey);
+    if (decoded) {
+      const userId = await appDataSource.query(
+        `SELECT id
+      FROM users
+      WHERE users.email = ?;
       `,
-    [title, content, imageUrl, userId]
-  );
-  res.status(201).json({ message: "postCreated" });
+        [email]
+      );
+      await appDataSource.query(
+        `INSERT INTO posts(
+        title,
+        content,
+        image_url,
+        user_id
+      ) VALUES (?, ?, ?, ?);
+        `,
+        [title, content, imageUrl, userId[0]["id"]]
+      );
+      res.status(201).json({ message: "postCreated" });
+    }
+  } catch (err) {
+    res.status(404).json({ message: "Invalid User" });
+  }
 });
 
 app.get("/posts", async (req, res) => {
@@ -184,7 +197,7 @@ app.post("/likes", async (req, res) => {
   const rows = await appDataSource.query(
     `SELECT *
     FROM likes
-    WHERE user_id = ? and post_id = ?
+    WHERE user_id = ? and post_id = ?;
     `,
     [userId, postId]
   );
