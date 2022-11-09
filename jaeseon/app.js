@@ -49,7 +49,7 @@ app.post('/users', async (req, res) => {
 });
 
 app.post('/posts', async (req, res) => {
-  const { title, content, user_id } = req.body;
+  const { title, content, userId } = req.body;
   await myDataSource.query(
     `INSERT INTO posts(
       title,
@@ -57,24 +57,24 @@ app.post('/posts', async (req, res) => {
       user_id
     ) VALUES (?, ?, ?);
     `,
-    [title, content, user_id]
+    [title, content, userId]
   );
   return res.status(201).json({ message: 'postCreated' });
 });
 
 app.get('/posts', async (req, res) => {
-  const usersPost = await myDataSource.query(
+  const posts = await myDataSource.query(
     `SELECT(
     users.id AS userId,
     users.profile_image AS userProfileImage,
     posts.id AS postingId,
     posts.content_image AS postingImageUrl,
     posts.content AS postingContent
-    FROM users, posts
+    FROM users
     INNER JOIN posts ON users.id = posts.user_id
   )`
   );
-  return res.status(200).json({ data: usersPost });
+  return res.status(200).json({ data: posts });
 });
 
 app.post('/likes', async (req, res) => {
