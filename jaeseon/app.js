@@ -50,7 +50,7 @@ app.post('/users', async (req, res) => {
 
 app.post('/posts', async (req, res) => {
   const { title, content, userId } = req.body;
-  await myDataSource.query(
+  await appDataSource.query(
     `INSERT INTO posts(
       title,
       content,
@@ -63,7 +63,7 @@ app.post('/posts', async (req, res) => {
 });
 
 app.get('/posts', async (req, res) => {
-  const posts = await myDataSource.query(
+  const posts = await appDataSource.query(
     `SELECT(
     users.id AS userId,
     users.profile_image AS userProfileImage,
@@ -77,9 +77,45 @@ app.get('/posts', async (req, res) => {
   return res.status(200).json({ data: posts });
 });
 
+app.get('/posts/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const [result] = await appDateSource.query(
+    `SELECT(
+    users.id AS userId,
+    users.profile_image AS userProfileImage,
+    post.postings
+    FROM users 
+    LEFT JOIN(
+      SELECT
+    user_id,
+    JSON_ARRAYAGG(
+      JSON_OBJECT(
+        "postingId",id,
+        "postingImageUrl", image_url,
+        "postingContent", content 
+        )
+      ) as postings
+    FROM posts
+    GROUP BY user_id
+    ) post ON post.user_id = users.id
+    WHERE users.id = ${userId}
+    )`
+  );
+  return res.status(200).json({ data: result });
+});
+
+app.delete('/posts/:postId', async (req, res) => {
+  const { postId } = req.params;
+  await appDateSource.query(
+    `DELETE FROM posts
+    WHERE posts.id = ${postId}`
+  );
+  return res.status(200).json({ message: 'postingDeleted' });
+});
+
 app.post('/likes', async (req, res) => {
   const { user_id, post_id } = req.body;
-  await myDataSource.query(
+  await appDataSource.query(
     `INSERT INTO likes(
       user_id
       post_id
