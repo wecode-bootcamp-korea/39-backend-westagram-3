@@ -88,7 +88,7 @@ app.post('/posts', async (req, res) => {
         );
         return res.status(201).json({ message: 'post successfully created' });
     } catch (err) {
-        if (err.message === 'invalid signature') {
+        if (err instanceof jwt.JsonWebTokenError) {
             return res.status(401).json({ error: 'unauthorized token' });
         } else {
             return res.status(520).json({ error: 'invalid input' });
