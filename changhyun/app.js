@@ -5,6 +5,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 const { DataSource } = require("typeorm");
 const app = express();
+const bcrypt = require("bcrypt");
 
 const PORT = process.env.PORT;
 
