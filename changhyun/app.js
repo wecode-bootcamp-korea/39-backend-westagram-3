@@ -3,7 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
-const { DataSource } = require("typeorm");
+const { DataSource, SimpleConsoleLogger } = require("typeorm");
 const app = express();
 const bcrypt = require("bcrypt");
 
@@ -31,11 +31,11 @@ app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json());
 
-app.get("/ping", function (req, res, next) {
+app.get("/ping", function (req, res) {
   return res.status(200).json({ message: "pong" });
 });
 
-app.post("/users", async (req, res, next) => {
+app.post("/users", async (req, res) => {
   const { name, email, profileImage, password } = req.body;
   const saltRounds = 12;
   const Hash = await bcrypt.hash(password, saltRounds);
@@ -52,7 +52,7 @@ app.post("/users", async (req, res, next) => {
   res.status(201).json({ message: "userCreated" });
 });
 
-app.post("/post", async (req, res, next) => {
+app.post("/post", async (req, res) => {
   const { title, content, imageUrl, userId } = req.body;
   await appDataSource.query(
     `INSERT INTO posts(
@@ -67,7 +67,7 @@ app.post("/post", async (req, res, next) => {
   res.status(201).json({ message: "postCreated" });
 });
 
-app.get("/posts", async (req, res, next) => {
+app.get("/posts", async (req, res) => {
   await appDataSource.query(
     `SELECT
       users.id as userID,
@@ -85,7 +85,7 @@ app.get("/posts", async (req, res, next) => {
   );
 });
 
-app.get("/users/:userId/posts", async (req, res, next) => {
+app.get("/users/:userId/posts", async (req, res) => {
   const { userId } = req.params;
   const userInfo = await appDataSource.query(
     `SELECT
@@ -110,7 +110,7 @@ app.get("/users/:userId/posts", async (req, res, next) => {
   res.status(200).json({ data: userInfo });
 });
 
-app.patch("/post/:userId/:postId", async (req, res, next) => {
+app.patch("/post/:userId/:postId", async (req, res) => {
   const { userId, postId } = req.params;
   const { content } = req.body;
   await appDataSource.query(
@@ -140,7 +140,7 @@ app.patch("/post/:userId/:postId", async (req, res, next) => {
   };
 });
 
-app.delete("/post/:postId", async (req, res, next) => {
+app.delete("/post/:postId", async (req, res) => {
   const { postId } = req.params;
   await appDataSource.query(
     `DELETE 
@@ -152,16 +152,31 @@ app.delete("/post/:postId", async (req, res, next) => {
   res.status(200).json({ message: "postingDeleted" });
 });
 
-app.post("/likes", async (req, res, next) => {
+app.post("/likes", async (req, res) => {
   const { userId, postId } = req.body;
-  await appDataSource.query(
-    `INSERT INTO likes(
-      user_id,
-      post_id
-    ) VALUES (?, ?);
-    `,
-    [userId, postId]
+  const rows = await appDataSource.query(
+    `SELECT *
+    FROM likes
+    WHERE user_id = ${userId} and post_id = ${postId}`
   );
+  if (rows.length === 0) {
+    await appDataSource.query(
+      `INSERT INTO likes(
+        user_id,
+        post_id
+      ) VALUES (?, ?);
+      `,
+      [userId, postId]
+    );
+  } else {
+    await appDataSource.query(
+      `DELETE
+        FROM likes
+        WHERE user_id = ? and post_id = ?;
+      `,
+      [userId, postId]
+    );
+  }
   res.status(201).json({ message: "likeCreated" });
 });
 
