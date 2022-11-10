@@ -7,8 +7,9 @@ const cors = require('cors');
 const morgan = require('morgan');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-
 const { DataSource } = require('typeorm');
+
+const auth = require('./middlewares/auth.js');
 
 const database = new DataSource({
     type: process.env.TYPEORM_CONNECTION,
@@ -69,13 +70,10 @@ app.post('/users', async (req, res) => {
     }
 });
 
-app.post('/posts', async (req, res) => {
+app.post('/posts', auth.loginRequired, async (req, res) => {
     const { title, content, contentImage } = req.body;
-    const token = req.headers.authorization;
-
+    const userId = req.user[0].id;
     try {
-        const decodedToken = await jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decodedToken.id;
         await database.query(
             `INSERT INTO posts(
                 title,
@@ -88,11 +86,7 @@ app.post('/posts', async (req, res) => {
         );
         return res.status(201).json({ message: 'post successfully created' });
     } catch (err) {
-        if (err instanceof jwt.JsonWebTokenError) {
-            return res.status(401).json({ error: 'unauthorized token' });
-        } else {
-            return res.status(520).json({ error: 'invalid input' });
-        }
+        return res.status(520).json({ error: 'invalid input' });
     }
 });
 
@@ -223,25 +217,24 @@ app.post('/likes', async (req, res) => {
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
-        const rows = await database.query(
+        const [rows] = await database.query(
             `SELECT email,password,id
                 FROM users
                 WHERE email = ?;
             `,
             [email]
         );
-        if (rows.length < 1) {
-            throw 'invalid email';
-        } else if (!(await bcrypt.compare(password, rows[0].password))) {
-            throw 'invalid password';
-        } else {
-            const token = await jwt.sign(
-                { email: rows[0].email, id: rows[0].id },
-                process.env.JWT_SECRET,
-                { expiresIn: '7d' }
-            );
-            return res.status(200).json({ accessToken: token });
-        }
+
+        if (!rows) throw 'invalid email';
+
+        const match = await bcrypt.compare(password, rows.password);
+
+        if (!match) throw 'invalid password';
+
+        const token = await jwt.sign({ id: rows.id }, process.env.JWT_SECRET, {
+            expiresIn: '7d',
+        });
+        return res.status(200).json({ accessToken: token });
     } catch (err) {
         return res.status(401).json({ message: 'Invalid email or password' });
     }
