@@ -5,8 +5,11 @@ const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
-
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { DataSource } = require('typeorm');
+
+const auth = require('./middlewares/auth.js');
 
 const database = new DataSource({
     type: process.env.TYPEORM_CONNECTION,
@@ -37,6 +40,10 @@ app.get('/ping', (req, res) => {
 
 app.post('/users', async (req, res) => {
     const { name, email, password, profileImage } = req.body;
+    const hashedpassword = await bcrypt.hash(
+        password,
+        parseInt(process.env.BCRYPT_SALT)
+    );
 
     try {
         await database.query(
@@ -47,7 +54,7 @@ app.post('/users', async (req, res) => {
                 profile_image
             ) VALUES (?,?,?,?);
             `,
-            [name, email, password, profileImage]
+            [name, email, hashedpassword, profileImage]
         );
         return res.status(201).json({ message: 'user successfully created' });
     } catch (err) {
@@ -63,9 +70,9 @@ app.post('/users', async (req, res) => {
     }
 });
 
-app.post('/posts', async (req, res) => {
-    const { title, content, contentImage, userId } = req.body;
-
+app.post('/posts', auth.loginRequired, async (req, res) => {
+    const { title, content, contentImage } = req.body;
+    const userId = req.user[0].id;
     try {
         await database.query(
             `INSERT INTO posts(
@@ -79,11 +86,7 @@ app.post('/posts', async (req, res) => {
         );
         return res.status(201).json({ message: 'post successfully created' });
     } catch (err) {
-        if (err.sqlMessage.includes('foreign key constraint fails')) {
-            return res.status(409).json({ error: 'no such user' });
-        } else {
-            return res.status(520).json({ error: 'unknown error' });
-        }
+        return res.status(520).json({ error: 'invalid input' });
     }
 });
 
@@ -196,25 +199,44 @@ app.post('/likes', async (req, res) => {
     );
 
     try {
-        if (rows.length === 0) {
-            await database.query(
-                `INSERT INTO likes(
+        await database.query(
+            `INSERT INTO likes(
                     user_id,
                     post_id
                 ) VALUES (?,?);
                 `,
-                [userId, postId]
-            );
-            return res.status(201).json({ message: 'like Created' });
-        } else {
-            throw 'already liked';
-        }
+            [userId, postId]
+        );
+
+        return res.status(201).json({ message: 'like Created' });
     } catch (err) {
-        if (err === 'already liked') {
-            return res.status(409).json({ error: err });
-        } else {
-            return res.status(520).json({ error: 'Invalid input' });
-        }
+        return res.status(520).json({ error: 'Invalid input' });
+    }
+});
+
+app.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const [rows] = await database.query(
+            `SELECT email,password,id
+                FROM users
+                WHERE email = ?;
+            `,
+            [email]
+        );
+
+        if (!rows) throw 'invalid email';
+
+        const match = await bcrypt.compare(password, rows.password);
+
+        if (!match) throw 'invalid password';
+
+        const token = await jwt.sign({ id: rows.id }, process.env.JWT_SECRET, {
+            expiresIn: '7d',
+        });
+        return res.status(200).json({ accessToken: token });
+    } catch (err) {
+        return res.status(401).json({ message: 'Invalid email or password' });
     }
 });
 
