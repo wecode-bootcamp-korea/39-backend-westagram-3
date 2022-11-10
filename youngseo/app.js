@@ -7,13 +7,13 @@ const morgan = require("morgan");
 const dotenv = require("dotenv");
 const bcrypt = require("bcrypt");
 const jwt = require('jsonwebtoken');
-const secretKey = process.env.SECRET_KEY;
+const secretKey = process.env.JWT_SECRET_KEY;
 
-// const router = express.Router();
-// const { postController } = require("../controllers");
-// router.post("", postController.createPost);
-//import { validateToken } from '../youngseo/middlewares/auth'
-// module.exports = router;
+const { loginRequired } = require('./middlewares/auth.js')
+
+const makeHash = async (password, saltRounds) => {
+    return await bcrypt.hash(password, saltRounds);
+}
 
 const { DataSource } = require('typeorm');
 
@@ -47,14 +47,8 @@ app.get("/ping", (req,res) => {
 });
 
 app.post("/users/signup", async (req, res) => {
-    const { name, email, password, profile_image } = req.body
-    const saltRounds = 12;
-
-    const makeHash = async (password, saltRounds) => {
-        return await bcrypt.hash(password, saltRounds);
-    }
-    
-    const hashedPassword = await makeHash(password, saltRounds);
+    const { name, email, password, profile_image } = req.body 
+    const hashedPassword = await makeHash(password, 12);
 
     await appDataSource.query(
         `INSERT INTO users(
@@ -75,46 +69,42 @@ app.post("/users/login", async (req, res) => {
 
     const [userInfo] = await appDataSource.query(
         `SELECT 
-            users.email,
-            users.password
+            *
         FROM users
         WHERE users.email = ?
         `, [email]
     );
 
-    const checkHash = async (password, hashedPassword) => {
-        return await bcrypt.compare(password, hashedPassword)
-    }
+    const match = await bcrypt.compare(password, userInfo.password)
 
-    if (await checkHash(password, userInfo.password)) {
-        const payLoad = { 
-            email : email,
-            password : userInfo.password
-        };
-        const jwtToken = jwt.sign(payLoad,secretKey);
-        return res.status(201).json({accessToken: jwtToken });
-    } else {
+    if (!match) {
         return res.status(409).json({ message : "Invalid User" });
-    }
+    };
 
-})
+    const payLoad = { userId : userInfo.id };
+    const jwtToken = jwt.sign(payLoad, secretKey);
+    return res.status(200).json({ accessToken: jwtToken });
+});
 
-app.post("/posts", async (req, res) => {
-    const { title, content, content_image, user_id } = req.body
+
+app.post("/posts", loginRequired, async (req, res) => {
+    const { title, content, content_image} = req.body
+    const { userId } = req.user.id
 
     await appDataSource.query(
         `INSERT INTO posts(
             title,
             content,
             content_image,
-            user_id
+            userId
         ) VALUES (?, ?, ?, ?);
         `,
-        [ title, content, content_image, user_id ]
+        [ title, content, content_image, userId ]
     ); 
 
     return res.status(201).json({ message: "postCreated" });
 });
+
 
 app.get("/posts", async(req, res) => {
     await appDataSource.query(
@@ -191,6 +181,7 @@ app.patch("/posts/:postId", async (req, res) => {
     return res.status(200).json({data: result});
 });
 
+
 app.delete("/posts/:postId", async (req,res) => {
     const postId = req.params.postId
 
@@ -216,7 +207,7 @@ app.post("/likes", async (req, res) => {
     );
   return res.status(201).json({ message: "likeCreated" })
 } catch (err) {
-    return res.status(409).json({ error: err.sqlMessage });
+    return res.status(409).json({ error: "DoubleLiked" });
 }
 });
 
